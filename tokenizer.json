@@ -1,0 +1,566 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [
+    {
+      "id": 0,
+      "content": "[PAD]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 1,
+      "content": "[CLS]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 2,
+      "content": "[SEP]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 3,
+      "content": "[MASK]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 4,
+      "content": "[UNK]",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }
+  ],
+  "normalizer": null,
+  "pre_tokenizer": {
+    "type": "Whitespace"
+  },
+  "post_processor": null,
+  "decoder": null,
+  "model": {
+    "type": "BPE",
+    "dropout": null,
+    "unk_token": null,
+    "continuing_subword_prefix": null,
+    "end_of_word_suffix": null,
+    "fuse_unk": false,
+    "byte_fallback": false,
+    "ignore_merges": false,
+    "vocab": {
+      "[PAD]": 0,
+      "[CLS]": 1,
+      "[SEP]": 2,
+      "[MASK]": 3,
+      "[UNK]": 4,
+      "\"": 5,
+      "#": 6,
+      "'": 7,
+      "(": 8,
+      ")": 9,
+      "+": 10,
+      ",": 11,
+      ".": 12,
+      "0": 13,
+      "1": 14,
+      "2": 15,
+      ":": 16,
+      ";": 17,
+      "<": 18,
+      "=": 19,
+      ">": 20,
+      "K": 21,
+      "N": 22,
+      "U": 23,
+      "V": 24,
+      "[": 25,
+      "\\": 26,
+      "]": 27,
+      "_": 28,
+      "a": 29,
+      "b": 30,
+      "c": 31,
+      "d": 32,
+      "e": 33,
+      "f": 34,
+      "g": 35,
+      "h": 36,
+      "i": 37,
+      "j": 38,
+      "k": 39,
+      "l": 40,
+      "m": 41,
+      "n": 42,
+      "o": 43,
+      "p": 44,
+      "r": 45,
+      "s": 46,
+      "t": 47,
+      "u": 48,
+      "v": 49,
+      "w": 50,
+      "x": 51,
+      "y": 52,
+      "z": 53,
+      "ok": 54,
+      "tok": 55,
+      "en": 56,
+      "in": 57,
+      "):": 58,
+      "te": 59,
+      "de": 60,
+      "oc": 61,
+      "token": 62,
+      "',": 63,
+      "loc": 64,
+      "loctok": 65,
+      "as": 66,
+      "op": 67,
+      "rs": 68,
+      "xt": 69,
+      "text": 70,
+      "def": 71,
+      "tokens": 72,
+      "opt": 73,
+      "():": 74,
+      "__": 75,
+      "if": 76,
+      "im": 77,
+      "ite": 78,
+      "rin": 79,
+      "ass": 80,
+      "''": 81,
+      "[]": 82,
+      "ap": 83,
+      "ar": 84,
+      "ain": 85,
+      "ce": 86,
+      "iz": 87,
+      "le": 88,
+      "lim": 89,
+      "or": 90,
+      "pen": 91,
+      "prin": 92,
+      "pass": 93,
+      "re": 94,
+      "tu": 95,
+      "wh": 96,
+      "delim": 97,
+      "tokeniz": 98,
+      "iters": 99,
+      "appen": 100,
+      "print": 101,
+      "delimiters": 102,
+      "tokenize": 103,
+      "append": 104,
+      "':": 105,
+      "(''": 106,
+      "))": 107,
+      "+=": 108,
+      "NK": 109,
+      "UNK": 110,
+      "])": 111,
+      "an": 112,
+      "at": 113,
+      "bp": 114,
+      "bas": 115,
+      "dp": 116,
+      "es": 117,
+      "ece": 118,
+      "gv": 119,
+      "ic": 120,
+      "ile": 121,
+      "iece": 122,
+      "jo": 123,
+      "main": 124,
+      "rn": 125,
+      "st": 126,
+      "sy": 127,
+      "wor": 128,
+      "argv": 129,
+      "retu": 130,
+      "while": 131,
+      "tokenizers": 132,
+      "(''.": 133,
+      "and": 134,
+      "bpe": 135,
+      "basic": 136,
+      "dpiece": 137,
+      "join": 138,
+      "sys": 139,
+      "wordpiece": 140,
+      "return": 141
+    },
+    "merges": [
+      [
+        "o",
+        "k"
+      ],
+      [
+        "t",
+        "ok"
+      ],
+      [
+        "e",
+        "n"
+      ],
+      [
+        "i",
+        "n"
+      ],
+      [
+        ")",
+        ":"
+      ],
+      [
+        "t",
+        "e"
+      ],
+      [
+        "d",
+        "e"
+      ],
+      [
+        "o",
+        "c"
+      ],
+      [
+        "tok",
+        "en"
+      ],
+      [
+        "'",
+        ","
+      ],
+      [
+        "l",
+        "oc"
+      ],
+      [
+        "loc",
+        "tok"
+      ],
+      [
+        "a",
+        "s"
+      ],
+      [
+        "o",
+        "p"
+      ],
+      [
+        "r",
+        "s"
+      ],
+      [
+        "x",
+        "t"
+      ],
+      [
+        "te",
+        "xt"
+      ],
+      [
+        "de",
+        "f"
+      ],
+      [
+        "token",
+        "s"
+      ],
+      [
+        "op",
+        "t"
+      ],
+      [
+        "(",
+        "):"
+      ],
+      [
+        "_",
+        "_"
+      ],
+      [
+        "i",
+        "f"
+      ],
+      [
+        "i",
+        "m"
+      ],
+      [
+        "i",
+        "te"
+      ],
+      [
+        "r",
+        "in"
+      ],
+      [
+        "as",
+        "s"
+      ],
+      [
+        "'",
+        "'"
+      ],
+      [
+        "[",
+        "]"
+      ],
+      [
+        "a",
+        "p"
+      ],
+      [
+        "a",
+        "r"
+      ],
+      [
+        "a",
+        "in"
+      ],
+      [
+        "c",
+        "e"
+      ],
+      [
+        "i",
+        "z"
+      ],
+      [
+        "l",
+        "e"
+      ],
+      [
+        "l",
+        "im"
+      ],
+      [
+        "o",
+        "r"
+      ],
+      [
+        "p",
+        "en"
+      ],
+      [
+        "p",
+        "rin"
+      ],
+      [
+        "p",
+        "ass"
+      ],
+      [
+        "r",
+        "e"
+      ],
+      [
+        "t",
+        "u"
+      ],
+      [
+        "w",
+        "h"
+      ],
+      [
+        "de",
+        "lim"
+      ],
+      [
+        "token",
+        "iz"
+      ],
+      [
+        "ite",
+        "rs"
+      ],
+      [
+        "ap",
+        "pen"
+      ],
+      [
+        "prin",
+        "t"
+      ],
+      [
+        "delim",
+        "iters"
+      ],
+      [
+        "tokeniz",
+        "e"
+      ],
+      [
+        "appen",
+        "d"
+      ],
+      [
+        "'",
+        ":"
+      ],
+      [
+        "(",
+        "''"
+      ],
+      [
+        ")",
+        ")"
+      ],
+      [
+        "+",
+        "="
+      ],
+      [
+        "N",
+        "K"
+      ],
+      [
+        "U",
+        "NK"
+      ],
+      [
+        "]",
+        ")"
+      ],
+      [
+        "a",
+        "n"
+      ],
+      [
+        "a",
+        "t"
+      ],
+      [
+        "b",
+        "p"
+      ],
+      [
+        "b",
+        "as"
+      ],
+      [
+        "d",
+        "p"
+      ],
+      [
+        "e",
+        "s"
+      ],
+      [
+        "e",
+        "ce"
+      ],
+      [
+        "g",
+        "v"
+      ],
+      [
+        "i",
+        "c"
+      ],
+      [
+        "i",
+        "le"
+      ],
+      [
+        "i",
+        "ece"
+      ],
+      [
+        "j",
+        "o"
+      ],
+      [
+        "m",
+        "ain"
+      ],
+      [
+        "r",
+        "n"
+      ],
+      [
+        "s",
+        "t"
+      ],
+      [
+        "s",
+        "y"
+      ],
+      [
+        "w",
+        "or"
+      ],
+      [
+        "ar",
+        "gv"
+      ],
+      [
+        "re",
+        "tu"
+      ],
+      [
+        "wh",
+        "ile"
+      ],
+      [
+        "tokenize",
+        "rs"
+      ],
+      [
+        "(''",
+        "."
+      ],
+      [
+        "an",
+        "d"
+      ],
+      [
+        "bp",
+        "e"
+      ],
+      [
+        "bas",
+        "ic"
+      ],
+      [
+        "dp",
+        "iece"
+      ],
+      [
+        "jo",
+        "in"
+      ],
+      [
+        "sy",
+        "s"
+      ],
+      [
+        "wor",
+        "dpiece"
+      ],
+      [
+        "retu",
+        "rn"
+      ]
+    ]
+  }
+}
