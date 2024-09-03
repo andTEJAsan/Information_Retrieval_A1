@@ -6,7 +6,6 @@ import sys
 
 from collections import defaultdict
 import json
-import pandas as pd
 delimiters = [' ', ',', '.', ':', ';', '"', '\'']
 def simple_tokenize(sentence): # takes a string and returns a list of tokens, removes punctuation whitespaces
 	text = sentence
@@ -50,13 +49,11 @@ def word_tokenize(sentence):
 	if(loctok):
 		tokens.append(''.join(loctok))
 	return tokens
-def test(path):
-	df = pd.read_json(path, lines=True)
-	print(df.head)
 class my_tokenizer:
 	def __init__(self, path, sz=10):
 		self.tokens = set()
-		df = pd.read_json(path, lines=True)
+		with open(path, 'r') as f:
+			df = [json.loads(line) for line in f]
 		# first half of the data
 		n = len(df)
 		sz = n // 2
@@ -65,7 +62,7 @@ class my_tokenizer:
 	def get_sentences(self):
 		sentences = []
 		fields = ['title', 'abstract', 'doi', 'date']
-		for index, row in self.df.iterrows():
+		for index, row in enumerate(self.df):
 			for field in fields:
 				if field in row:
 					sentences.append(str(row[field]))
