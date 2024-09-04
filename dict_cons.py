@@ -1,5 +1,6 @@
 # coding: utf-8
 import sys
+import pickle
 
 # In[26]:
 
@@ -7,6 +8,11 @@ import sys
 from collections import defaultdict
 import json
 delimiters = [' ', ',', '.', ':', ';', '"', '\'']
+def unique(dump, array):
+    if(array):
+        dump.append(array[0])
+        for i in range(1, len(array)):
+            if(array[i] != array[i - 1]): dump.append(array[i])
 def simple_tokenize(sentence): # takes a string and returns a list of tokens, removes punctuation whitespaces
 	text = sentence
 	tokens = []
@@ -49,6 +55,7 @@ def word_tokenize(sentence):
 	if(loctok):
 		tokens.append(''.join(loctok))
 	return tokens
+	
 class my_tokenizer:
 	def __init__(self, path, sz=10):
 		self.tokens = set()
@@ -56,9 +63,18 @@ class my_tokenizer:
 			df = [json.loads(line) for line in f]
 		# first half of the data
 		n = len(df)
-		sz = n // 2
+		# sz = n // 2
 		self.df = df[:sz]
 		self.merges = []
+		# self.doc_no_map = {}
+		self.doc_id_map = [0] * len(self.df)
+		for index, row in enumerate(self.df):
+			# self.doc_no_map[row['doc_id']] = index
+			self.doc_id_map[index] = row['doc_id']
+		self.tf  = {}
+		self.docf = defaultdict(int)
+
+		self.inverted_idx = defaultdict(list)
 	def get_sentences(self):
 		sentences = []
 		fields = ['title', 'abstract', 'doi', 'date']
@@ -153,6 +169,69 @@ class my_tokenizer:
 		output["type"] = "bpe"
 		json.dump(output, open(path, 'w'))
 
+	def compute_inverted_index_simple(self):
+		for index, row in enumerate(self.df):
+			fields = ['title', 'abstract', 'doi', 'date']
+			for field in fields:
+				tokens = simple_tokenize(str(row[field]))
+				for tok in tokens:
+					if(len(self.inverted_idx[tok]) == 0):
+						self.inverted_idx[tok].append(index)
+					elif(self.inverted_idx[tok][-1] != index):
+						self.inverted_idx[tok].append(index)
+
+					if tok in self.tf:
+						self.tf[tok][index] += 1
+					else:
+						self.tf[tok] = [0] * len(self.df)
+						self.tf[tok][index] += 1
+
+					self.docf[tok] += (self.tf[tok][index] == 1)
+		pass
+	def bpe_tokenize(self, word):
+		chars = list(word)
+		for merge in self.merges:
+			i = 0
+			while i < len(chars) - 1:
+				if (chars[i], chars[i + 1]) == merge:
+					new_chars = chars[:i]
+					new_chars.append(merge[0] + merge[1])
+					new_chars.extend(chars[i+2:])
+					chars = new_chars
+				else:
+					i += 1
+		return chars
+    
+	def compute_inverted_index_bpe(self):
+		for index, row in enumerate(self.df):
+			fields = ['title', 'abstract', 'doi', 'date']
+			for field in fields:
+				tokens = word_tokenize(str(row[field]))
+				for tok in tokens:
+					merged = self.bpe_tokenize(tok)
+					for subword_tok in merged:
+						if(len(self.inverted_idx[subword_tok]) == 0):
+							self.inverted_idx[subword_tok].append(index)
+						elif(self.inverted_idx[subword_tok][-1] != index):
+							self.inverted_idx[subword_tok].append(index)
+						self.docf[subword_tok] += (self.tf[subword_tok][index] == 0)
+						self.tf[subword_tok][index] += 1
+			
+		
+     
+	def write_inverted_index(self, path):
+		# want to map from token to a list of docids
+		# also compute term frequencies
+		data = {}
+		data["length"] = len(self.df)
+		data["tf"] = self.tf
+		data["docf"] = self.docf
+		data["inverted_idx"] = self.inverted_idx
+		data["doc_id_map"] = self.doc_id_map
+		with open(path, 'wb') as f:
+			pickle.dump(data, f)
+		pass
+
 
 
 # In[27]:
@@ -201,7 +280,7 @@ if __name__ == '__main__':
 		tokenizer.simple_train()
 		tokenizer.write_vocabulary_simple('./output.dict')
 	if (opt == 1):
-		tokenizer.bpe_train(10)
+		tokenizer.bpe_train(30)
 		tokenizer.write_vocabulary_bpe('./output.dict')
      
 # In[ ]:
