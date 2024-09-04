@@ -1,6 +1,8 @@
 import sys
 import pickle
 import time
+from nltk.tokenize import RegexpTokenizer
+import re
 
 # In[26]:
 
@@ -62,6 +64,14 @@ def word_tokenize(sentence):
 		tokens.append(''.join(loctok))
 	return tokens
 	
+def word_tokenize2(sentence):
+	pattern = r'[' + ''.join(re.escape(d) for d in [' ', ',', '.', ':', ';', '"', '\'']) + r']+'
+	tokz = RegexpTokenizer(pattern, gaps=True)
+	tokens = tokz.tokenize(sentence.lower())
+	for i in range(len(tokens)):
+		tokens[i] += '_'
+	return tokens
+     
 class my_tokenizer:
 	def __init__(self, path, sz=10):
 		self.tokens = set()
@@ -104,7 +114,7 @@ class my_tokenizer:
 		t = time.time()
 		word_freqs = defaultdict(int)
 		for sentence in sentences:
-			word_tokens = word_tokenize(sentence)
+			word_tokens = word_tokenize2(sentence)
 			for word in word_tokens:
 				word_freqs[word] += 1
 		print(f"word freqs took {time.time() - t}")
