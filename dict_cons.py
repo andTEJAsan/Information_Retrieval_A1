@@ -1,15 +1,16 @@
 import sys
 import pickle
 import time
-from nltk.tokenize import RegexpTokenizer
+# from nltk.tokenize import RegexpTokenizer
 import re
 
 # In[26]:
 
 
+special_char = ':'
 from collections import defaultdict
 import json
-delimiters = [' ', ',', '.', ':', ';', '"', '\'']
+delimiters = [' ', ',', '.', ':', ';', '"', '\'', '0', '1', '2','3','4','5','6','7','8','9']
 def unique(dump, array):
     if(array):
         dump.append(array[0])
@@ -65,9 +66,9 @@ def word_tokenize(sentence):
 	return tokens
 	
 def word_tokenize2(sentence):
-	pattern = r'[' + ''.join(re.escape(d) for d in [' ', ',', '.', ':', ';', '"', '\'']) + r']+'
-	tokz = RegexpTokenizer(pattern, gaps=True)
-	tokens = tokz.tokenize(sentence.lower())
+	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
+	# tokz = RegexpTokenizer(pattern, gaps=True)
+	tokens = re.split(pattern, sentence.lower())
 	for i in range(len(tokens)):
 		tokens[i] += '_'
 	return tokens
@@ -106,6 +107,79 @@ class my_tokenizer:
 			for tok in tokens:
 				self.tokens.add(tok)
 		pass
+
+	def wpe_train(self, k):
+		t = time.time()
+		sentences = self.get_sentences()
+		print(f"getting sentences took {time.time() - t}")
+		# sentences = ['low low low low low lowest lowest newer newer newer newer newer newer wider wider wider new new ']
+		t = time.time()
+		word_freqs = defaultdict(int)
+		for sentence in sentences:
+			word_tokens = word_tokenize2(sentence)
+			for word in word_tokens:
+				word_freqs[word] += 1
+		print(f"word freqs took {time.time() - t}")
+
+		# now build the base vocabulary
+		# print(word_freqs)
+		t = time.time()
+		word_splits = {}
+		base_vocabulary = set()
+		for word in word_freqs.keys():
+			initial_split = list(word)
+			for i in range(1, len(initial_split)):
+				initial_split[i] = special_char + initial_split[i]
+				base_vocabulary.add(initial_split[i])
+			if(initial_split):
+				base_vocabulary.add(initial_split[0])
+			word_splits[word] = initial_split
+		print(f"building base vocabulary took {time.time() - t}")
+		print(f"initial base vocabulary size = {len(base_vocabulary)}")
+		merges = []
+		while(len(merges) < k):
+			t = time.time()
+			pair_freqs = defaultdict(int)
+			for word in word_freqs.keys():
+				subword_tok_list = word_splits[word]
+				n = len(subword_tok_list)
+				if n == 1: continue
+				for i in range(n - 1):
+					pair = (subword_tok_list[i], subword_tok_list[i+1])
+					pair_freqs[pair] += word_freqs[word]
+
+			# as an optimization could map the pairs to the words they are in
+
+			# max_pair = None
+			# max_freq = 0
+			# for pair, freq in pair_freqs.items():
+			# 	if freq > max_freq:
+			# 		max_pair = pair
+			# 		max_freq = freq
+			max_pair = max(pair_freqs, key=pair_freqs.get)
+			if(max_pair == None): break
+			base_vocabulary.add(max_pair[0] + max_pair[1])
+			merges.append(max_pair)
+			for word in word_splits.keys():
+				if len(word_splits[word]) == 1: continue
+				i = 0 
+				while i < len(word_splits[word]) - 1:
+					subword_tok_list = word_splits[word]
+					pair = (subword_tok_list[i], subword_tok_list[i+1])
+					if pair == max_pair:
+						new_word_splits = subword_tok_list[:i]
+						new_word_splits.append(max_pair[0] + max_pair[1])
+						new_word_splits.extend(subword_tok_list[i+2:])
+						word_splits[word] = new_word_splits
+					else: i += 1
+			print(f"merge {len(merges) - 1} took {time.time() - t}")
+			# get the most frequent pair
+		print(len(merges))
+		print(merges)
+		print(len(base_vocabulary))
+		self.tokens = base_vocabulary
+		self.merges = merges
+
 	def bpe_train(self, k):
 		t = time.time()
 		sentences = self.get_sentences()
@@ -134,6 +208,7 @@ class my_tokenizer:
 		while(len(merges) < k):
 			t = time.time()
 			pair_freqs = defaultdict(int)
+			pair_words = defaultdict(list)
 			for word in word_freqs.keys():
 				subword_tok_list = word_splits[word]
 				n = len(subword_tok_list)
@@ -141,6 +216,7 @@ class my_tokenizer:
 				for i in range(n - 1):
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					pair_freqs[pair] += word_freqs[word]
+					pair_words[pair].append(word)
 
 			# as an optimization could map the pairs to the words they are in
 
