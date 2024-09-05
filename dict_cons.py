@@ -1,7 +1,7 @@
 import sys
 import pickle
 import time
-# from nltk.tokenize import RegexpTokenizer
+from nltk.tokenize import RegexpTokenizer
 import re
 
 # In[26]:
@@ -17,29 +17,11 @@ def unique(dump, array):
         for i in range(1, len(array)):
             if(array[i] != array[i - 1]): dump.append(array[i])
 def simple_tokenize(sentence): # takes a string and returns a list of tokens, removes punctuation whitespaces
-	text = sentence
-	tokens = []
-	i = 0
-	n = len(text)
-	loctok = []
-	while(i < n):
-		if(ord(text[i]) > 127):
-			i += 1
-			continue
-		if(text[i] in delimiters):
-			tokens.append((''.join(loctok)))
-			loctok = []
-			j = i
-			while(j < n and text[j] in delimiters):
-				j += 1
-			i = j
-		else: 
-			loctok.append(text[i].lower())
-			i += 1
-	if(loctok):
-		tokens.append(''.join(loctok))
+	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
+	# tokz = RegexpTokenizer(pattern, gaps=True)
+	tokens = re.split(pattern, sentence.lower())
 	return tokens
-def word_tokenize(sentence):
+def word_tokenize2(sentence):
 	text = sentence
 	tokens = []
 	i = 0
@@ -65,10 +47,16 @@ def word_tokenize(sentence):
 		tokens.append(''.join(loctok))
 	return tokens
 	
-def word_tokenize2(sentence):
+def word_tokenize3(sentence):
 	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
-	# tokz = RegexpTokenizer(pattern, gaps=True)
-	tokens = re.split(pattern, sentence.lower())
+	tokz = RegexpTokenizer(pattern, gaps=True)
+	# tokens = re.split(pattern, sentence.lower())
+	tokens = tokz.tokenize(sentence.lower())
+	for i in range(len(tokens)):
+		tokens[i] += '_'
+	return tokens
+def word_tokenize(sentence):
+	# tokens = tokz.tokenize(sentence.lower(), gaps=True)
 	for i in range(len(tokens)):
 		tokens[i] += '_'
 	return tokens
@@ -116,7 +104,7 @@ class my_tokenizer:
 		t = time.time()
 		word_freqs = defaultdict(int)
 		for sentence in sentences:
-			word_tokens = word_tokenize2(sentence)
+			word_tokens = word_tokenize(sentence)
 			for word in word_tokens:
 				word_freqs[word] += 1
 		print(f"word freqs took {time.time() - t}")
@@ -125,28 +113,34 @@ class my_tokenizer:
 		# print(word_freqs)
 		t = time.time()
 		word_splits = {}
-		base_vocabulary = set()
+		base_vocabulary = defaultdict(int)
 		for word in word_freqs.keys():
 			initial_split = list(word)
 			for i in range(1, len(initial_split)):
 				initial_split[i] = special_char + initial_split[i]
-				base_vocabulary.add(initial_split[i])
+				base_vocabulary[(initial_split[i])] += 1
 			if(initial_split):
-				base_vocabulary.add(initial_split[0])
+				base_vocabulary[(initial_split[0])] += 1
 			word_splits[word] = initial_split
-		print(f"building base vocabulary took {time.time() - t}")
-		print(f"initial base vocabulary size = {len(base_vocabulary)}")
+		print(f"building base vocabulary in wpe took {time.time() - t}")
+		print(f"initial base vocabulary wpe size = {len(base_vocabulary)}")
 		merges = []
 		while(len(merges) < k):
 			t = time.time()
 			pair_freqs = defaultdict(int)
+			single_freqs = defaultdict(int)
+			pair_words = defaultdict(list)
 			for word in word_freqs.keys():
 				subword_tok_list = word_splits[word]
 				n = len(subword_tok_list)
+				for i in range(n):
+					single_freqs[subword_tok_list[i]] += word_freqs[word]
 				if n == 1: continue
 				for i in range(n - 1):
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					pair_freqs[pair] += word_freqs[word]
+					pair_words[pair].append(word)
+				
 
 			# as an optimization could map the pairs to the words they are in
 
@@ -156,11 +150,16 @@ class my_tokenizer:
 			# 	if freq > max_freq:
 			# 		max_pair = pair
 			# 		max_freq = freq
-			max_pair = max(pair_freqs, key=pair_freqs.get)
-			if(max_pair == None): break
-			base_vocabulary.add(max_pair[0] + max_pair[1])
+			max_pair = max(pair_freqs, key= lambda x : pair_freqs[x] / (single_freqs[x[0]] * single_freqs[x[1]]))
+			if(not max_pair): break
+			merged_max_pair = None
+			if(max_pair[1][0] == special_char):
+				merged_max_pair = max_pair[0] + max_pair[1][1:]
+			else:
+				merged_max_pair = max_pair[0] + max_pair[1]
+			base_vocabulary.add(merged_max_pair)
 			merges.append(max_pair)
-			for word in word_splits.keys():
+			for word in pair_words[pair]:
 				if len(word_splits[word]) == 1: continue
 				i = 0 
 				while i < len(word_splits[word]) - 1:
@@ -168,11 +167,11 @@ class my_tokenizer:
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					if pair == max_pair:
 						new_word_splits = subword_tok_list[:i]
-						new_word_splits.append(max_pair[0] + max_pair[1])
+						new_word_splits.append(merged_max_pair)
 						new_word_splits.extend(subword_tok_list[i+2:])
 						word_splits[word] = new_word_splits
 					else: i += 1
-			print(f"merge {len(merges) - 1} took {time.time() - t}")
+			print(f"merge {len(merges) - 1} took {time.time() - t} in wpe")
 			# get the most frequent pair
 		print(len(merges))
 		print(merges)
@@ -188,7 +187,7 @@ class my_tokenizer:
 		t = time.time()
 		word_freqs = defaultdict(int)
 		for sentence in sentences:
-			word_tokens = word_tokenize2(sentence)
+			word_tokens = word_tokenize(sentence)
 			for word in word_tokens:
 				word_freqs[word] += 1
 		print(f"word freqs took {time.time() - t}")
@@ -230,10 +229,11 @@ class my_tokenizer:
 			if(max_pair == None): break
 			base_vocabulary.add(max_pair[0] + max_pair[1])
 			merges.append(max_pair)
-			for word in word_splits.keys():
+			# for word in word_splits.keys():
+			for word in pair_words[max_pair]:
 				if len(word_splits[word]) == 1: continue
 				i = 0 
-				while i < len(word_splits[word]) - 1:
+				while i < (len(word_splits[word]) - 1):
 					subword_tok_list = word_splits[word]
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					if pair == max_pair:
@@ -270,6 +270,16 @@ class my_tokenizer:
 		output["vocabulary"] = vocab
 		output["type"] = "bpe"
 		json.dump(output, open(path, 'w'))
+	def write_vocabulary_wpe(self, path):
+		vocab = {}
+		for item in self.tokens:
+			vocab[item] = 1
+		output = {}
+		# output["merges"] = self.merges
+		output["vocabulary"] = vocab
+		output["type"] = "wpe"
+		json.dump(output, open(path, 'w'))
+
 
 	def compute_inverted_index_simple(self):
 		for index, row in enumerate(self.df):
