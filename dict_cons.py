@@ -1,13 +1,16 @@
 import sys
+import math
 import pickle
 import time
-from nltk.tokenize import RegexpTokenizer
+# from nltk.tokenize import RegexpTokenizer
+
 import re
+from trie import Trie
 
 # In[26]:
 
 
-special_char = ':'
+special_char = "##"
 from collections import defaultdict
 import json
 delimiters = [' ', ',', '.', ':', ';', '"', '\'', '0', '1', '2','3','4','5','6','7','8','9']
@@ -17,9 +20,13 @@ def unique(dump, array):
         for i in range(1, len(array)):
             if(array[i] != array[i - 1]): dump.append(array[i])
 def simple_tokenize(sentence): # takes a string and returns a list of tokens, removes punctuation whitespaces
+	sentence = re.sub(r'[^a-zA-Z0-9 ,.:;"\']+', ' ', sentence)
 	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
+	# pattern += r'|[^a-zA-Z0-9\s]'
 	# tokz = RegexpTokenizer(pattern, gaps=True)
+	# exams me what do you have to do ? 
 	tokens = re.split(pattern, sentence.lower())
+	tokens = [tok for tok in tokens if tok]
 	return tokens
 def word_tokenize2(sentence):
 	text = sentence
@@ -47,16 +54,17 @@ def word_tokenize2(sentence):
 		tokens.append(''.join(loctok))
 	return tokens
 	
-def word_tokenize3(sentence):
-	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
-	tokz = RegexpTokenizer(pattern, gaps=True)
-	# tokens = re.split(pattern, sentence.lower())
-	tokens = tokz.tokenize(sentence.lower())
-	for i in range(len(tokens)):
-		tokens[i] += '_'
-	return tokens
+# def word_tokenize3(sentence):
+# 	pattern = r'[' + re.escape(''.join(delimiters)) + r']+'
+# 	tokz = RegexpTokenizer(pattern, gaps=True)
+# 	# tokens = re.split(pattern, sentence.lower())
+# 	tokens = tokz.tokenize(sentence.lower())
+# 	for i in range(len(tokens)):
+# 		tokens[i] += '_'
+# 	return tokens
 def word_tokenize(sentence):
 	# tokens = tokz.tokenize(sentence.lower(), gaps=True)
+	tokens = simple_tokenize(sentence)
 	for i in range(len(tokens)):
 		tokens[i] += '_'
 	return tokens
@@ -78,6 +86,7 @@ class my_tokenizer:
 			self.doc_id_map[index] = row['doc_id']
 		self.tf  = {}
 		self.docf = defaultdict(int)
+		self.trie = Trie()
 
 		self.inverted_idx = defaultdict(list)
 	def get_sentences(self):
@@ -101,10 +110,16 @@ class my_tokenizer:
 		sentences = self.get_sentences()
 		print(f"getting sentences took {time.time() - t}")
 		# sentences = ['low low low low low lowest lowest newer newer newer newer newer newer wider wider wider new new ']
+# 		sentences = [
+#     "This is the Hugging Face Course.",
+#     "This chapter is about tokenization.",
+#     "This section shows several tokenizer algorithms.",
+#     "Hopefully, you will be able to understand how they are trained and generate tokens.",
+# ]
 		t = time.time()
 		word_freqs = defaultdict(int)
 		for sentence in sentences:
-			word_tokens = word_tokenize(sentence)
+			word_tokens = simple_tokenize(sentence)
 			for word in word_tokens:
 				word_freqs[word] += 1
 		print(f"word freqs took {time.time() - t}")
@@ -113,14 +128,14 @@ class my_tokenizer:
 		# print(word_freqs)
 		t = time.time()
 		word_splits = {}
-		base_vocabulary = defaultdict(int)
+		base_vocabulary = set()
 		for word in word_freqs.keys():
 			initial_split = list(word)
 			for i in range(1, len(initial_split)):
 				initial_split[i] = special_char + initial_split[i]
-				base_vocabulary[(initial_split[i])] += 1
+				base_vocabulary.add((initial_split[i]))
 			if(initial_split):
-				base_vocabulary[(initial_split[0])] += 1
+				base_vocabulary.add((initial_split[0]))
 			word_splits[word] = initial_split
 		print(f"building base vocabulary in wpe took {time.time() - t}")
 		print(f"initial base vocabulary wpe size = {len(base_vocabulary)}")
@@ -140,26 +155,36 @@ class my_tokenizer:
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					pair_freqs[pair] += word_freqs[word]
 					pair_words[pair].append(word)
+			if(len(pair_freqs) == 0): break
 				
 
 			# as an optimization could map the pairs to the words they are in
 
-			# max_pair = None
-			# max_freq = 0
-			# for pair, freq in pair_freqs.items():
-			# 	if freq > max_freq:
-			# 		max_pair = pair
-			# 		max_freq = freq
-			max_pair = max(pair_freqs, key= lambda x : pair_freqs[x] / (single_freqs[x[0]] * single_freqs[x[1]]))
+			max_pair = None
+			maxans = - math.inf
+			for pair, freq in pair_freqs.items():
+				if(single_freqs[pair[0]] * single_freqs[pair[1]] == 0): 
+					print(f"1pair = {pair} single_freqs[pair[0]] = {single_freqs[pair[0]]} single_freqs[pair[1]] = {single_freqs[pair[1]]}")
+					continue
+				# if((2*math.log(freq) - math.log(single_freqs[pair[0]]) - math.log(single_freqs[pair[1]])) > maxans):
+				# 	max_pair = pair
+				# 	print(f"pair = {pair} single_freqs[pair[0]] = {single_freqs[pair[0]]} single_freqs[pair[1]] = {single_freqs[pair[1]]}")
+				# 	maxans = 2 * math.log(freq) - math.log(single_freqs[pair[0]]) - math.log(single_freqs[pair[1]])
+				# 	# maxans = (freq * freq) / (single_freqs[pair[0]] * single_freqs[pair[1]])
+				# 	print(f"maxans = {maxans}")
+				# 	print(f"single_freqs[pair[0]] = {single_freqs[pair[0]]} single_freqs[pair[1]] = {single_freqs[pair[1]]}")
+				# 	print(f"pair_freqs[pair] = {pair_freqs[pair]}")
+			max_pair = max(pair_freqs, key= lambda x : math.log(pair_freqs[x]) - math.log(single_freqs[x[0]]) - math.log(single_freqs[x[1]]))
+			# max_pair = max(pair_freqs, key= lambda x : pair_freqs[x] / (single_freqs[x[0]] * single_freqs[x[1]])  )
 			if(not max_pair): break
 			merged_max_pair = None
-			if(max_pair[1][0] == special_char):
-				merged_max_pair = max_pair[0] + max_pair[1][1:]
+			if(max_pair[1].startswith(special_char)):
+				merged_max_pair = max_pair[0] + max_pair[1][2:]
 			else:
 				merged_max_pair = max_pair[0] + max_pair[1]
 			base_vocabulary.add(merged_max_pair)
-			merges.append(max_pair)
-			for word in pair_words[pair]:
+			merges.append((max_pair))
+			for word in pair_words[max_pair]:
 				if len(word_splits[word]) == 1: continue
 				i = 0 
 				while i < len(word_splits[word]) - 1:
@@ -178,6 +203,8 @@ class my_tokenizer:
 		print(len(base_vocabulary))
 		self.tokens = base_vocabulary
 		self.merges = merges
+		print(self.tokens)
+
 
 	def bpe_train(self, k):
 		t = time.time()
@@ -208,6 +235,7 @@ class my_tokenizer:
 			t = time.time()
 			pair_freqs = defaultdict(int)
 			pair_words = defaultdict(list)
+			t1 = time.time()
 			for word in word_freqs.keys():
 				subword_tok_list = word_splits[word]
 				n = len(subword_tok_list)
@@ -216,8 +244,14 @@ class my_tokenizer:
 					pair = (subword_tok_list[i], subword_tok_list[i+1])
 					pair_freqs[pair] += word_freqs[word]
 					pair_words[pair].append(word)
+			print(f"pair freqs took {time.time() - t1}")
 
 			# as an optimization could map the pairs to the words they are in
+			# first convert query to t-dimensional space (t = vocab size)
+			# convert all documents in the same way
+			# use cosine similarity to find the closest document
+			# documents are preprocessed ha but saare
+			# how ? 
 
 			# max_pair = None
 			# max_freq = 0
@@ -225,10 +259,12 @@ class my_tokenizer:
 			# 	if freq > max_freq:
 			# 		max_pair = pair
 			# 		max_freq = freq
+			if(len(pair_freqs) == 0): break
 			max_pair = max(pair_freqs, key=pair_freqs.get)
 			if(max_pair == None): break
 			base_vocabulary.add(max_pair[0] + max_pair[1])
 			merges.append(max_pair)
+			t1 = time.time()
 			# for word in word_splits.keys():
 			for word in pair_words[max_pair]:
 				if len(word_splits[word]) == 1: continue
@@ -242,6 +278,7 @@ class my_tokenizer:
 						new_word_splits.extend(subword_tok_list[i+2:])
 						word_splits[word] = new_word_splits
 					else: i += 1
+			print(f"merging took {time.time() - t1}")
 			print(f"merge {len(merges) - 1} took {time.time() - t}")
 			# get the most frequent pair
 		print(len(merges))
@@ -253,37 +290,21 @@ class my_tokenizer:
 		# print(word_splits)
 		# print(base_vocabulary)
 	def write_vocabulary_simple(self, path):
-		vocab = {}
-		for item in self.tokens:
-			vocab[item] = 1
-		output = {}
-		output["merges"] = self.merges
-		output["vocabulary"] = vocab
-		output["type"] = "simple"
-		json.dump(output, open(path, 'w'))
+		with open(path, 'w') as f:
+			for item in self.tokens:
+				f.write(item + ' ')
 	def write_vocabulary_bpe(self, path):
-		vocab = {}
-		for item in self.tokens:
-			vocab[item] = 1
-		output = {}
-		output["merges"] = self.merges
-		output["vocabulary"] = vocab
-		output["type"] = "bpe"
-		json.dump(output, open(path, 'w'))
+		with open(path, 'w') as f:
+			for item in self.tokens:
+				f.write(item + ' ')
 	def write_vocabulary_wpe(self, path):
-		vocab = {}
-		for item in self.tokens:
-			vocab[item] = 1
-		output = {}
-		# output["merges"] = self.merges
-		output["vocabulary"] = vocab
-		output["type"] = "wpe"
-		json.dump(output, open(path, 'w'))
-
+		with open(path, 'w') as f:
+			for item in self.tokens:
+				f.write(item + ' ')
 
 	def compute_inverted_index_simple(self):
 		for index, row in enumerate(self.df):
-			fields = ['title', 'abstract', 'doi', 'date']
+			fields = ['title', 'abstract']
 			for field in fields:
 				tokens = simple_tokenize(str(row[field]))
 				for tok in tokens:
@@ -300,35 +321,51 @@ class my_tokenizer:
 
 					self.docf[tok] += (self.tf[tok][index] == 1)
 		pass
-	def bpe_tokenize(self, word):
-		chars = list(word)
-		for merge in self.merges:
-			i = 0
-			while i < len(chars) - 1:
-				if (chars[i], chars[i + 1]) == merge:
-					new_chars = chars[:i]
-					new_chars.append(merge[0] + merge[1])
-					new_chars.extend(chars[i+2:])
-					chars = new_chars
-				else:
-					i += 1
-		return chars
+
+	def wpe_tokenize(self, words):
+		split_words = []
+		for word in words:
+			while(word)
+				pass
+
+
+
+
+	def bpe_tokenize(self, words):
+		split_words = []
+		for word in words:
+			chars = list(word)
+			for merge in self.merges:
+				i = 0
+				while i < len(chars) - 1:
+					if (chars[i], chars[i + 1]) == merge:
+						new_chars = chars[:i]
+						new_chars.append(merge[0] + merge[1])
+						new_chars.extend(chars[i+2:])
+						chars = new_chars
+					else:
+						i += 1
+			split_words.extend(chars)
+		return split_words
+	def wpe_tokenize(self, words):
     
 	def compute_inverted_index_bpe(self):
 		for index, row in enumerate(self.df):
-			fields = ['title', 'abstract', 'doi', 'date']
+			fields = ['title', 'abstract']
 			for field in fields:
 				tokens = word_tokenize(str(row[field]))
-				for tok in tokens:
-					merged = self.bpe_tokenize(tok)
-					for subword_tok in merged:
-						if(len(self.inverted_idx[subword_tok]) == 0):
-							self.inverted_idx[subword_tok].append(index)
-						elif(self.inverted_idx[subword_tok][-1] != index):
-							self.inverted_idx[subword_tok].append(index)
-						self.docf[subword_tok] += (self.tf[subword_tok][index] == 0)
+				merged = self.bpe_tokenize(tokens)
+				for subword_tok in merged:
+					if(len(self.inverted_idx[subword_tok]) == 0):
+						self.inverted_idx[subword_tok].append(index)
+					elif(self.inverted_idx[subword_tok][-1] != index):
+						self.inverted_idx[subword_tok].append(index)
+					if subword_tok in self.tf:
 						self.tf[subword_tok][index] += 1
-			
+					else:
+						self.tf[subword_tok] = [0] * len(self.df)
+						self.tf[subword_tok][index] += 1	
+					self.docf[subword_tok] += (self.tf[subword_tok][index] == 1)
 		
      
 	def write_inverted_index(self, path):
@@ -384,6 +421,7 @@ class my_tokenizer:
 # plt.savefig('bpe_time.png')
 
 
+nsplits = 300 
 if __name__ == '__main__':
 	train_path = sys.argv[1]
 	opt = int(sys.argv[2])
@@ -392,8 +430,11 @@ if __name__ == '__main__':
 		tokenizer.simple_train()
 		tokenizer.write_vocabulary_simple('./output.dict')
 	if (opt == 1):
-		tokenizer.bpe_train(100)
+		tokenizer.bpe_train(nsplits)
 		tokenizer.write_vocabulary_bpe('./output.dict')
+	if (opt == 2):
+		tokenizer.wpe_train(nsplits)
+		tokenizer.write_vocabulary_wpe('./output.dict')
      
 # In[ ]:
 
