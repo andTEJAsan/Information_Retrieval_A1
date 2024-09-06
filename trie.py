@@ -24,6 +24,17 @@ class Trie:
         return word[:prefix_ind+1]
     def greedy_split(self, word) -> list:
         splits = []
+        while(word):
+            prefix = self.longest_prefix(word)
+            if(prefix):
+                splits.append(prefix)
+                word = word[len(prefix):]
+                if word:
+                    word = f"##{word}"
+            else:
+                break
+        return splits
+                
 
     def insert(self, word: str) -> None:
         # Insert a word into the Trie
