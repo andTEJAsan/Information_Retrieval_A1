@@ -92,6 +92,8 @@ class my_tokenizer:
 		self.tf  = {}
 		self.docf = defaultdict(int)
 		self.trie = Trie()
+		self.docmags = [0] * len(self.df)
+		
 		print(f"len(self.df) = {len(self.df)}")
 		print(f"len(self.get_sentences()) = {len(self.get_sentences())}")
 
@@ -244,9 +246,10 @@ class my_tokenizer:
 			for char in word:
 				base_vocabulary.add(char)
 			word_splits[word] = list(word)
+		self.trie = Trie(base_vocabulary)
 		print(f"building base vocabulary took {time.time() - t}")
 		print(f"initial base vocabulary size = {len(base_vocabulary)}")
-		merges = []
+		merges = self.merges
 		remaining = timeout - (time.time() - t)
 		st = time.time()
 		while(len(merges) < k):
@@ -282,6 +285,7 @@ class my_tokenizer:
 			max_pair = max(pair_freqs, key=pair_freqs.get)
 			if(max_pair == None): break
 			base_vocabulary.add(max_pair[0] + max_pair[1])
+			self.trie.insert(max_pair[0] + max_pair[1])
 			merges.append(max_pair)
 			t1 = time.time()
 			# for word in word_splits.keys():
@@ -315,22 +319,30 @@ class my_tokenizer:
 		with open(path, 'w') as f:
 			for item in self.tokens:
 				f.write(item + ' ')
+			f.write('\n')
 	def write_vocabulary_bpe(self, path):
 		with open(path, 'w') as f:
 			for item in self.tokens:
 				f.write(item + ' ')
+			f.write('\n')
 	def write_vocabulary_wpe(self, path):
 		with open(path, 'w') as f:
 			for item in self.tokens:
 				f.write(item + ' ')
+			f.write('\n')
 
-	def compute_inverted_index_simple(self):
+	def compute_inverted_index_simple(self, path):
 		for index, row in enumerate(self.df):
+			if index % (len(self.df) // 10) == 0:
+				self.write_inverted_index(path, 0)
 			print(f"index = {index}")
 			fields = ['title', 'abstract']
+
+			sot = set()
 			for field in fields:
-				tokens = simple_tokenize(str(row[field]))
+				tokens= simple_tokenize(str(row[field]))
 				for tok in tokens:
+					sot.add(tok)
 					if(len(self.inverted_idx[tok]) == 0):
 						self.inverted_idx[tok].append(index)
 					elif(self.inverted_idx[tok][-1] != index):
@@ -343,6 +355,10 @@ class my_tokenizer:
 						self.tf[tok][index] += 1
 
 					self.docf[tok] += (self.tf[tok][index] == 1)
+			mag = 0
+			for tok in sot:
+				mag += (self.tf[tok][index] * math.log(1 + (len(self.df) / self.docf[tok]))) ** 2
+			self.docmags[index] = math.sqrt(mag)
 		pass
 
 	def wpe_tokenize(self, words):
@@ -351,37 +367,35 @@ class my_tokenizer:
 			split_words.extend(self.trie.greedy_split(word))
 		return split_words
 
-
-
 	def bpe_tokenize(self, words):
 		split_words = []
 		for word in words:
-			chars = list(word)
-			for merge in self.merges:
-				i = 0
-				while i < len(chars) - 1:
-					if (chars[i], chars[i + 1]) == merge:
-						new_chars = chars[:i]
-						new_chars.append(merge[0] + merge[1])
-						new_chars.extend(chars[i+2:])
-						chars = new_chars
-					else:
-						i += 1
-			split_words.extend(chars)
+			split_words.extend(self.trie.greedy_split2(word))
 		return split_words
     
-	def compute_inverted_index_bpe(self):
+	def compute_inverted_index_bpe(self, path):
 		t = time.time() 
+		t1 = 0
+		t2 = 0
 		for index, row in enumerate(self.df):
-			if index % 100 == 0:
+			if index % (len(self.df) // 10) == 0:
+				self.write_inverted_index(path, 1)
 				print(f"index = {index} took {time.time() - t}")
+				print(f"t1 = {t1} t2 = {t2}")
+				t1 = 0
+				t2 = 0
 				t = time.time()
-
 			fields = ['title', 'abstract']
+			sot = set()
 			for field in fields:
+				t = time.time()
 				tokens = word_tokenize(str(row[field]))
 				merged = self.bpe_tokenize(tokens)
+				# print(f"time for tokenization = {time.time() - t}")
+				t1 += time.time() - t
+				t = time.time()
 				for subword_tok in merged:
+					sot.add(subword_tok)
 					if(len(self.inverted_idx[subword_tok]) == 0):
 						self.inverted_idx[subword_tok].append(index)
 					elif(self.inverted_idx[subword_tok][-1] != index):
@@ -392,16 +406,36 @@ class my_tokenizer:
 						self.tf[subword_tok] = defaultdict(int)
 						self.tf[subword_tok][index] += 1	
 					self.docf[subword_tok] += (self.tf[subword_tok][index] == 1)
-				print(f"index = {index} took {time.time() - t}")
+				# print(f"index = {index} took {time.time() - t}")
+				t2 += time.time() - t
+			mag = 0
+			for tok in sot:
+				mag += (self.tf[tok][index] * math.log(1 + (len(self.df) / self.docf[tok]))) ** 2
+			self.docmags[index] = math.sqrt(mag)
+				# print(f"time for inverted index = {time.time() - t}")
 		
-	def compute_inverted_index_wpe(self):
+	def compute_inverted_index_wpe(self, path):
+		t = time.time() 
+		t1 = 0
+		t2 = 0
 		for index, row in enumerate(self.df):
 			fields = ['title', 'abstract']
+			if index % (len(self.df) // 10) == 0:
+				self.write_inverted_index(path, 2)
+				print(f"index = {index} took {time.time() - t}")
+				print(f"t1 = {t1} t2 = {t2}")
+				t1 = 0
+				t2 = 0
+				t = time.time()
+			sot = set()
 			for field in fields:
 		# for index, sentence in enumerate(self.get_sentences()):
+				t = time.time()
 				tokens = simple_tokenize(str(row[field]))
 				# tokens = simple_tokenize(sentence)
 				merged = self.wpe_tokenize(tokens)
+				t1 += time.time() - t
+				t = time.time()
 				for subword_tok in merged:
 					if(len(self.inverted_idx[subword_tok]) == 0):
 						self.inverted_idx[subword_tok].append(index)
@@ -413,6 +447,11 @@ class my_tokenizer:
 						self.tf[subword_tok] = defaultdict(int)
 						self.tf[subword_tok][index] += 1	
 					self.docf[subword_tok] += (self.tf[subword_tok][index] == 1)
+				t2 += time.time() - t
+			mag = 0
+			for tok in sot:
+				mag += (self.tf[tok][index] * math.log(1 + (len(self.df) / self.docf[tok]))) ** 2
+			self.docmags[index] = math.sqrt(mag)
      
 	def write_inverted_index(self, path, opt):
 		# want to map from token to a list of docids
@@ -420,13 +459,13 @@ class my_tokenizer:
 		options = ["simple", "bpe", "wpe"]
 		data = {}
 		data["type"] = options[opt]
-		data["merges"] = self.merges
 		data["length"] = len(self.df)
 		data["tf"] = self.tf
 		data["docf"] = self.docf
 		data["inverted_idx"] = self.inverted_idx
 		data["doc_id_map"] = self.doc_id_map
-		data["trie"] = self.trie
+		data["docmags"] = self.docmags
+		# data["trie"] = self.trie
 		with open(path, 'wb') as f:
 			pickle.dump(data, f)
 		pass

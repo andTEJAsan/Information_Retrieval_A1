@@ -34,6 +34,16 @@ class Trie:
             else:
                 break
         return splits
+    def greedy_split2(self, word) -> list:
+        splits = []
+        while(word):
+            prefix = self.longest_prefix(word)
+            if(prefix):
+                splits.append(prefix)
+                word = word[len(prefix):]
+            else:
+                break
+        return splits
                 
 
     def insert(self, word: str) -> None:
