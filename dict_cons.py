@@ -1,4 +1,5 @@
 import sys
+import multiprocessing
 import math
 import pickle
 import time
@@ -79,11 +80,15 @@ class my_tokenizer:
 		sz = n // 2
 		self.df = df[:sz]
 		self.merges = []
-		# self.doc_no_map = {}
-		self.doc_id_map = [0] * len(self.df)
+		self.doc_no_map = {}
+		self.doc_id_map = []
+		new_df = []
 		for index, row in enumerate(self.df):
-			# self.doc_no_map[row['doc_id']] = index
-			self.doc_id_map[index] = row['doc_id']
+			if not (row['doc_id'] in self.doc_no_map):
+				self.doc_id_map.append(row['doc_id'])
+				self.doc_no_map[row['doc_id']] = len(self.doc_no_map) - 1 
+				new_df.append(row)
+		self.df = new_df
 		self.tf  = {}
 		self.docf = defaultdict(int)
 		self.trie = Trie()
@@ -99,15 +104,16 @@ class my_tokenizer:
 				if field in row:
 					sentences.append(str(row[field]))
 		return sentences
-	def simple_train(self):
+	def simple_train(self, path):
 		sentences = self.get_sentences()
 		for sentence in sentences:
 			tokens = simple_tokenize(sentence)
 			for tok in tokens:
 				self.tokens.add(tok)
+		self.write_vocabulary_simple(path)
 		pass
 
-	def wpe_train(self, k,b):
+	def wpe_train(self, k,b, timeout, path):
 		t = time.time()
 		sentences = self.get_sentences()
 		print(f"getting sentences took {time.time() - t}")
@@ -130,7 +136,7 @@ class my_tokenizer:
 		# print(word_freqs)
 		t = time.time()
 		word_splits = {}
-		base_vocabulary = set()
+		base_vocabulary = self.tokens
 		for word in word_freqs.keys():
 			initial_split = list(word)
 			for i in range(1, len(initial_split)):
@@ -145,7 +151,10 @@ class my_tokenizer:
 		t = time.time()
 		self.trie = Trie(base_vocabulary)
 		print(f"trie building took {time.time() - t}")
+		remaining = timeout - (time.time() - t)
+		st = time.time()
 		while(len(merges) < k):
+			if(time.time() - st > remaining): break
 			t = time.time()
 			pair_freqs = defaultdict(int)
 			single_freqs = defaultdict(int)
@@ -203,16 +212,17 @@ class my_tokenizer:
 						word_splits[word] = new_word_splits
 					else: i += 1
 			print(f"merge {len(merges) - 1} took {time.time() - t} in wpe")
+			t = time.time()
+			self.write_vocabulary_wpe(path)
+			print(f"writing vocabulary took {time.time() - t}")
 			# get the most frequent pair
 		print(len(merges))
 		print(merges)
 		print(len(base_vocabulary))
-		self.tokens = base_vocabulary
-		self.merges = merges
 		print(self.tokens)
 
 
-	def bpe_train(self, k):
+	def bpe_train(self, k, timeout, path):
 		t = time.time()
 		sentences = self.get_sentences()
 		print(f"getting sentences took {time.time() - t}")
@@ -237,7 +247,10 @@ class my_tokenizer:
 		print(f"building base vocabulary took {time.time() - t}")
 		print(f"initial base vocabulary size = {len(base_vocabulary)}")
 		merges = []
+		remaining = timeout - (time.time() - t)
+		st = time.time()
 		while(len(merges) < k):
+			if(time.time() - st > remaining): break
 			t = time.time()
 			pair_freqs = defaultdict(int)
 			pair_words = defaultdict(list)
@@ -286,6 +299,9 @@ class my_tokenizer:
 					else: i += 1
 			print(f"merging took {time.time() - t1}")
 			print(f"merge {len(merges) - 1} took {time.time() - t}")
+			t = time.time()
+			self.write_vocabulary_bpe(path)
+			print(f"writing vocabulary took {time.time() - t}")
 			# get the most frequent pair
 		print(len(merges))
 		print(merges)
@@ -310,6 +326,7 @@ class my_tokenizer:
 
 	def compute_inverted_index_simple(self):
 		for index, row in enumerate(self.df):
+			print(f"index = {index}")
 			fields = ['title', 'abstract']
 			for field in fields:
 				tokens = simple_tokenize(str(row[field]))
@@ -322,7 +339,7 @@ class my_tokenizer:
 					if tok in self.tf:
 						self.tf[tok][index] += 1
 					else:
-						self.tf[tok] = [0] * len(self.df)
+						self.tf[tok] = defaultdict(int)
 						self.tf[tok][index] += 1
 
 					self.docf[tok] += (self.tf[tok][index] == 1)
@@ -354,7 +371,12 @@ class my_tokenizer:
 		return split_words
     
 	def compute_inverted_index_bpe(self):
+		t = time.time() 
 		for index, row in enumerate(self.df):
+			if index % 100 == 0:
+				print(f"index = {index} took {time.time() - t}")
+				t = time.time()
+
 			fields = ['title', 'abstract']
 			for field in fields:
 				tokens = word_tokenize(str(row[field]))
@@ -367,9 +389,10 @@ class my_tokenizer:
 					if subword_tok in self.tf:
 						self.tf[subword_tok][index] += 1
 					else:
-						self.tf[subword_tok] = [0] * len(self.df)
+						self.tf[subword_tok] = defaultdict(int)
 						self.tf[subword_tok][index] += 1	
 					self.docf[subword_tok] += (self.tf[subword_tok][index] == 1)
+				print(f"index = {index} took {time.time() - t}")
 		
 	def compute_inverted_index_wpe(self):
 		for index, row in enumerate(self.df):
@@ -387,19 +410,23 @@ class my_tokenizer:
 					if subword_tok in self.tf:
 						self.tf[subword_tok][index] += 1
 					else:
-						self.tf[subword_tok] = [0] * len(self.df)
+						self.tf[subword_tok] = defaultdict(int)
 						self.tf[subword_tok][index] += 1	
 					self.docf[subword_tok] += (self.tf[subword_tok][index] == 1)
      
-	def write_inverted_index(self, path):
+	def write_inverted_index(self, path, opt):
 		# want to map from token to a list of docids
 		# also compute term frequencies
+		options = ["simple", "bpe", "wpe"]
 		data = {}
+		data["type"] = options[opt]
+		data["merges"] = self.merges
 		data["length"] = len(self.df)
 		data["tf"] = self.tf
 		data["docf"] = self.docf
 		data["inverted_idx"] = self.inverted_idx
 		data["doc_id_map"] = self.doc_id_map
+		data["trie"] = self.trie
 		with open(path, 'wb') as f:
 			pickle.dump(data, f)
 		pass
@@ -445,18 +472,19 @@ class my_tokenizer:
 
 
 timeout = 295
+nsplits = 1000
 if __name__ == '__main__':
 	train_path = sys.argv[1]
 	opt = int(sys.argv[2])
 	tokenizer = my_tokenizer(train_path + "/cord19-trec_covid-docs")
 	if (opt == 0):
-		tokenizer.simple_train()
+		tokenizer.simple_train('./output.dict')
 		tokenizer.write_vocabulary_simple('./output.dict')
 	if (opt == 1):
-		tokenizer.bpe_train(nsplits)
+		tokenizer.bpe_train(nsplits,timeout, './output.dict')
 		tokenizer.write_vocabulary_bpe('./output.dict')
 	if (opt == 2):
-		tokenizer.wpe_train(nsplits,2)
+		tokenizer.wpe_train(nsplits,2, timeout, './output.dict')
 		tokenizer.write_vocabulary_wpe('./output.dict')
 
      
